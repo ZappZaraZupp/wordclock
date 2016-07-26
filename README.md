@@ -1,2 +1,2 @@
 # wordclock
-My personla wordclock
+My wordclock
