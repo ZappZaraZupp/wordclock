@@ -1,15 +1,186 @@
-int x_led show:
-	ldr lesen und brightness setzen
-	led setzen
+#define PIN MLED 6
+#define PIN ZLED 7
+#define PIN_LDR 12
 
-init:
-	2 led stripes
-	a) matrix (m-led) 
-	b) zwischenminuten und status (z-led)
+#define MAX_BRIGHT 255
+#define MIN_BRIGHT 100
+
+stripe m_led=new fastLED(PIN_MLED,121,800khz);
+stripe z_led=new fastLED(PIN_ZLED,5,800khz);
+
+color c_status=rot;
+
+uint_t16 line[11];
+
+// texte
+#define T_ES          line[0] |= 0b1100000000000000
+#define T_IST0        line[0] |= 0b0001110000000000
+#define T_FUNF0       line[0] |= 0b0000000111100000
+#define T_ZEHN1       line[1] |= 0b1111000000000000
+#define T_ZWANZIG     line[1] |= 0b0000111111100000
+#define T_DREI2       line[2] |= 0b1111000000000000
+#define T_DREIVIERTEL line[2] |= 0b1111111111100000
+#define T_VIER2       line[2] |= 0b0000111100000000
+#define T_VIERTEL     line[2] |= 0b0000111111100000
+#define T_VOR         line[3] |= 0b1110000000000000
+#define T_UM          line[3] |= 0b0000110000000000
+#define T_NACH3       line[3] |= 0b0000000111100000
+#define T_HALB        line[4] |= 0b1111000000000000
+#define T_ELF         line[4] |= 0b0000011100000000
+#define T_FUNF4       line[4] |= 0b0000000111100000
+#define T_EIN         line[5] |= 0b1110000000000000
+#define T_EINS        line[5] |= 0b1111000000000000
+#define T_TAG         line[5] |= 0b0000111000000000
+#define T_ZWEI        line[5] |= 0b0000000111100000
+#define T_DREI6       line[6] |= 0b1111000000000000
+#define T_IST6        line[6] |= 0b0001110000000000
+#define T_ZWOLF       line[6] |= 0b0000001111100000
+#define T_SIEBEN      line[7] |= 0b1111110000000000
+#define T_VIER7       line[7] |= 0b0000000111100000
+#define T_SECHS       line[8] |= 0b1111100000000000
+#define T_NACH8       line[8] |= 0b0000001111100000
+#define T_NACHT       line[8] |= 0b0000001111100000
+#define T_ACHT        line[8] |= 0b0000000111100000
+#define T_ZEHN9       line[9] |= 0b1111000000000000
+#define T_NEUN        line[9] |= 0b0001111000000000
+#define T_UHR         line[9] |= 0b0000000011100000
+
+int setWords(curtime) {
+	T_ES;
+	T_IST0;
+	if(0 <= curtime.min && curtime.min < 5) {
+		// Es ist <h> Uhr
+		// Es ist um <h>
+		// Achtung bei ein uhr
+	}
+	else if( 5 <= curtime.min && curtime.min < 10) {
+		// Es ist fünf nach <h>
+		// 5 nach 9 oder 10 geht auch mit funf4 und nach8
+		if(curtime.hour == 9 || curtime.hour == 10) { 
+			swithc((int)(rand(3))) {
+			default:
+			case 1:
+				T_FUNF0;
+				T_NACH3;
+				break;
+			case 2:
+				T_FUNF0;
+				T_NACH8;
+				break;
+			case 3:
+				T_FUNF4;
+				T_NACH8;
+				break;
+			}
+		}
+		else {
+			T_FUNF0;
+			T_NACH3;
+		}
+		setHour(curtime.hour);
+	}
+	else if( 10 <= curtime.min && curtime.min < 15) {
+		// Es ist zehn nach <h>
+	}
+	else if( 15 <= curtime.min && curtime.min < 20) {
+		// Es ist viertel nach <h>
+		// Es ist viertel <h+1>
+	}
+	else if( 20 <= curtime.min && curtime.min < 25) {
+		// Es ist zwanzig nach <h>
+	}
+	else if( 25 <= curtime.min && curtime.min < 30) {
+		// Es ist fünf vor halb <h+1>
+	}
+	else if( 30 <= curtime.min && curtime.min < 35) {
+		// Es ist halb <h+1>
+	}
+	else if( 35 <= curtime.min && curtime.min < 40) {
+		// Es ist fünf nach halb <h+1>
+	}
+	else if( 40 <= curtime.min && curtime.min < 45) {
+		// Es ist zwanzig vor <h+1>
+	}
+	else if( 45 <= curtime.min && curtime.min < 50) {
+		// Es ist viertel vor <h+1>
+		// Es ist dreiviertel <h+1>
+	}
+	else if( 50 <= curtime.min && curtime.min < 55) {
+		// Es ist zehn vor <h+1>
+	}
+	else if( 55 <= curtime.min && curtime.min < 60) {
+		// Es ist fünf vor <h+1>
+	}
+	return 0;
+}
+
+int setWordHour(h) {
+	switch(h) {
+		case 100:
+			T_EIN;
+		break;
+		case 1:
+			T_EINS;
+		break;
+		case 2:
+			T_ZWEI;
+		break;
+		case 3:
+			T_DREI;
+		break;
+		case 4:
+			T_VIER;
+		break;
+		case 5:
+			T_FUNF4;
+		break;
+		case 6:
+			T_SECHS;
+		break;
+		case 7:
+			T_SIEBEN;
+		break;
+		case 8:
+			T_ACHT;
+		break;
+		case 9:
+			T_NEUN;
+		break;
+		case 10:
+			T_ZEHN;
+		break;
+		case 11:
+			T_ELF; 
+		break;
+		case 12:
+		case 0:
+			T_ZWOLF;
+		break;
+	}
+}
+
+int showLed(stripe) {
+	float r_bright = analogRead(PIN_LDR)/1023.0;
+	stripe.setBrightness((int)(MIN_BRIGHT+(MAX_BRIGHT-MIN_BRIGHT)*r_bright));
+	stripe.show();
+	return 0;
+}
+
+init() {
+	m_led.begin;
+	z_led.begin;
+	showLed(m_led);
+	z_led.setColor(3,c_status); // status led rot
+	showLed(z_led);
 	DCF sync starten (syncprovider),
-	statusfarbe rot solange kein sync
-	warten aus dcf sync blinken im empfangstakt?
-	statusfarbe grün
+	loop(sync) {
+		warten aus dcf sync blinken im empfangstakt?
+	}
+	c_status=grün;
+	setWords(dcfcurtime)
+	showLed(m_led);
+	showLed(z_led);
+}
 
 loop:
 sync verlohren? statusfarbe auf rot
