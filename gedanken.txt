@@ -5,12 +5,6 @@
 #define MAX_BRIGHT 255
 #define MIN_BRIGHT 100
 
-stripe m_led=new fastLED(PIN_MLED,121,800khz);
-stripe z_led=new fastLED(PIN_ZLED,5,800khz);
-
-color c_status=rot;
-
-uint_t16 line[11];
 
 // texte
 #define T_ES          line[0] |= 0b1100000000000000
@@ -44,6 +38,18 @@ uint_t16 line[11];
 #define T_ZEHN9       line[9] |= 0b1111000000000000
 #define T_NEUN        line[9] |= 0b0001111000000000
 #define T_UHR         line[9] |= 0b0000000011100000
+
+CRGB m_leds[121];
+CRGB z_leds[5];
+
+color c_status=CRGB::Red;
+
+uint_t16 line[11];
+
+void setup() {
+	FastLED.addLeds<WS2812B, PIN_MLED>(m_leds, 121);
+	FastLED.addLeds<WS2812B, PIN_ZLED>(z_leds, 5);
+}
 
 int setWords(curtime) {
 	T_ES;
@@ -157,6 +163,33 @@ int setWordHour(h) {
 			T_ZWOLF;
 		break;
 	}
+}
+
+void setLEDs() {
+
+   for (byte row = 0; row < 11; row++) 
+   {
+      for (byte col = 0; col < 16; col++) 
+      {
+         boolean masker = bitRead(mask[row], 15 - col); // bitread is backwards because bitRead reads rightmost digits first. could have defined the word masks differently
+         switch (masker) 
+         {
+            case 0:
+               matrix.drawPixel(col, row, 0);
+               break;
+            case 1:
+              // matrix.drawPixel(col, row, Wheel(((col * 256 / matrix.numPixels()) + j) & 255));
+              // word_mode color set
+               matrix.drawPixel(col, row, matrix.Color(dimred, dimgreen, dimblue));
+               break;
+         }
+      }
+      // reset mask for next time
+      mask[row] = 0;
+   }
+
+
+   matrix.show(); // show it!
 }
 
 int showLed(stripe) {
