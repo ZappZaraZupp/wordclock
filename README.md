@@ -1,2 +1,4 @@
 # wordclock
-My wordclock
+My implementation of a wordclock
+
+

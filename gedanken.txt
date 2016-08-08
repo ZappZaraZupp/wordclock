@@ -1,0 +1,53 @@
+int x_led show:
+	ldr lesen und brightness setzen
+	led setzen
+
+init:
+	2 led stripes
+	a) matrix (m-led) 
+	b) zwischenminuten und status (z-led)
+	DCF sync starten (syncprovider),
+	statusfarbe rot solange kein sync
+	warten aus dcf sync blinken im empfangstakt?
+	statusfarbe grün
+
+loop:
+sync verlohren? statusfarbe auf rot
+synk ok? statusfarbe auf grün
+taster abfragen
+	modus
+		uhrmodus
+		laufschrift datum
+		laufschrift sekunden
+		party
+		silvestermodus
+	farbmodus
+		farbe nach tageszeit anpassen
+		wörter verschiedenfarbig
+		regenbogen
+uhrmodus
+	if(o_sec != sec) { 
+		status != status // sekundentakt
+		if(o_min != min)
+			if(min % 5 == 0) // 5 minuten vergangen
+				switch (min) {
+					...
+				}
+				m_led show
+			}
+			switch(min % 5) { // eine minute vergangen
+				case 0: z_led=status
+					break
+				case 1: z_led=ein|status
+				2: eins|zwei|status
+				...
+			}
+		}
+		z_led show
+	}
+
+laufschrift modus
+	datum
+	sekunden
+partymodus
+silvestermodus
