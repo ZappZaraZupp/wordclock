@@ -58,12 +58,29 @@ int setWords(curtime) {
 		// Es ist <h> Uhr
 		// Es ist um <h>
 		// Achtung bei ein uhr
+		switch((int)(rand(2))) {
+		default:
+		case 1:
+			if(curtime.hour==1) {
+				setWordHour(100);
+			}
+			else {
+				setWordHour(curtime.hour);
+			}
+			T_UHR;
+			break;
+		case 2:
+			T_UM;
+			setWordHour(curtime.hour);
+			break;
+		}
+			
 	}
 	else if( 5 <= curtime.min && curtime.min < 10) {
 		// Es ist fünf nach <h>
 		// 5 nach 9 oder 10 geht auch mit funf4 und nach8
 		if(curtime.hour == 9 || curtime.hour == 10) { 
-			swithc((int)(rand(3))) {
+			switch((int)(rand(3))) {
 			default:
 			case 1:
 				T_FUNF0;
@@ -83,10 +100,29 @@ int setWords(curtime) {
 			T_FUNF0;
 			T_NACH3;
 		}
-		setHour(curtime.hour);
+		setWordHour(curtime.hour);
 	}
 	else if( 10 <= curtime.min && curtime.min < 15) {
 		// Es ist zehn nach <h>
+		// 10 nach 9 oder 10 geht auch mit nach8
+		if(curtime.hour == 9 || curtime.hour == 10) { 
+			switch((int)(rand(2))) {
+			default:
+			case 1:
+				T_ZEHN1;
+				T_NACH3;
+				break;
+			case 2:
+				T_ZEHN1;
+				T_NACH8;
+				break;
+			}
+		}
+		else {
+			T_ZEHN1;
+			T_NACH3;
+		}
+		setWordHour(curtime.hour);
 	}
 	else if( 15 <= curtime.min && curtime.min < 20) {
 		// Es ist viertel nach <h>
