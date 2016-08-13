@@ -1,17 +1,24 @@
-#include <FastLED.h>
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+  #include <avr/power.h>
+#endif
 
-#define LED_MPIN  6
-#define LED_ZPIN  7
-#define COLOR_ORDER GRB
-#define CHIPSET     WS2811
-#define BRIGHTNESS 64
+#define PIN_MLED  6
+#define PIN_ZLED  7
 
 const uint8_t width = 11;
 const uint8_t height = 10;
 const uint8_t zleds = 5;
 
-CRGB m-leds[width*height];
-CRGB z-leds[zled];
+Adafruit_NeoPixel m_led = Adafruit_NeoPixel(width*height, PIN_MLED, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel z_led = Adafruit_NeoPixel(zleds, PIN_ZLED, NEO_GRB + NEO_KHZ800);
+
+void setup() {
+  m_led.begin();
+  m_led.show(); // Initialize all pixels to 'off'
+  z_led.begin();
+  z_led.show(); // Initialize all pixels to 'off'
+}
 
 // Get number of LED 
 uint16_t XY( uint8_t x, uint8_t y)
@@ -24,6 +31,21 @@ uint16_t XY( uint8_t x, uint8_t y)
   i = (y * width) + x;
   
   return i;
+}
+
+void loop() {
+  colorWipe(m_led,m_led.Color(255, 0, 0), 50); // Red
+  colorWipe(m_led,m_led.Color(0, 255, 0), 50); // Green
+  colorWipe(m_led,m_led.Color(0, 0, 255), 50); // Blue
+}
+
+// Fill the dots one after the other with a color
+void colorWipe(Adafruit_NeoPixel strip,uint32_t c, uint8_t wait) {
+  for(uint16_t i=0; i<strip.numPixels(); i++) {
+    strip.setPixelColor(i, c);
+    strip.show();
+    delay(wait);
+  }
 }
 
 
