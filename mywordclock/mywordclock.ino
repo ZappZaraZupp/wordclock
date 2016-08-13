@@ -34,16 +34,21 @@ uint16_t XY( uint8_t x, uint8_t y)
 }
 
 void loop() {
-  colorWipe(m_led,m_led.Color(255, 0, 0), 50); // Red
-  colorWipe(m_led,m_led.Color(0, 255, 0), 50); // Green
-  colorWipe(m_led,m_led.Color(0, 0, 255), 50); // Blue
+  colorWipe(&m_led,m_led.Color(255, 0, 0), 5); // Red
+  colorWipe(&m_led,m_led.Color(0, 255, 0), 5); // Green
+  colorWipe(&m_led,m_led.Color(0, 0, 255), 5); // Blue
+  colorWipe(&m_led,m_led.Color(255, 255, 255), 5); // white
+  colorWipe(&z_led,z_led.Color(255, 0, 0), 50); // Red
+  colorWipe(&z_led,z_led.Color(0, 255, 0), 50); // Green
+  colorWipe(&z_led,z_led.Color(0, 0, 255), 50); // Blue
+  colorWipe(&z_led,z_led.Color(255, 255, 255), 50); // white
 }
 
 // Fill the dots one after the other with a color
-void colorWipe(Adafruit_NeoPixel strip,uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.show();
+void colorWipe(Adafruit_NeoPixel *strip,uint32_t c, uint8_t wait) {
+  for(uint16_t i=0; i<strip->numPixels(); i++) {
+    strip->setPixelColor(i, c);
+    strip->show();
     delay(wait);
   }
 }
