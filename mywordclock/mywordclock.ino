@@ -3,6 +3,10 @@
 #define PIN_MLED  6
 #define PIN_ZLED  7
 
+#define M_WIDTH 11;
+#define M_HEIGHT 10;
+#define Z_LEDS 5;
+
 // texte
 #define T_ES          line[0] |= 0b1100000000000000
 #define T_IST0        line[0] |= 0b0001110000000000
@@ -36,46 +40,39 @@
 #define T_NEUN        line[9] |= 0b0001111000000000
 #define T_UHR         line[9] |= 0b0000000011100000
 
-/*
-kann man sicher noch mehr kombinationen machen (todo)
-
-00:00	Es ist xx Uhr
-	Es ist um xx
-	** Es is ein Uhr
-	** Es ist um eins
-	** fünf[4]
-	** zehn[9]
-	** drei[6]
-	** vier[7]
-00:05	Es ist fünf[0] nach xx
-00:10	Es ist zehn[1] nach xx
-00:15	Es ist viertel nach xx
-	Es ist viertel xx+1
-00:20	Es ist zwanzig nach xx
-00:25	Es ist fünf[0] vor halb xx+1
-00:30	Es ist halb xx+1
-00:35	Es ist fünf[0] nach halb xx+1
-00:40	Es ist zwanzig vor xx+1
-00:45	Es ist viertel vor xx+1
-	Es ist dreiviertel xx+1
-00:50	Es ist zehn[1] vor xx+1
-00:55	Es ist fünf[0] vor xx+1
-*/
-
-#define M_WIDTH 11;
-#define M_HEIGHT 10;
-#define Z_LEDS 5;
+//ZLED
+#define T_M1  0b10000000;
+#define T_M2  0b11000000;
+#define T_M3  0b11010000;
+#define T_M4  0b11011000;
+#define T_ST  0b00100000;
 
 Adafruit_NeoPixel m_led = Adafruit_NeoPixel(M_WIDTH * M_HEIGHT, PIN_MLED, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel z_led = Adafruit_NeoPixel(Z_LEDS, PIN_ZLED, NEO_GRB + NEO_KHZ800);
 
-line[10] = { 0,0,0,0,0,0,0,0,0,0 };
+uint16_t line[10] = { 0,0,0,0,0,0,0,0,0,0 };
+
+uint8_t curstd=0, oldstd=0;
+uint8_t curmin=0, oldmin=0;
+uint8_t curzled=0, oldzled=0;
+uint16_t curbright=0; oldbright=0;
 
 void setup() {
   m_led.begin();
   m_led.show(); // Initialize all pixels to 'off'
   z_led.begin();
   z_led.show(); // Initialize all pixels to 'off'
+
+  colorWipe(&m_led,m_led.Color(255, 0, 0), 5); // Red
+  colorWipe(&m_led,m_led.Color(0, 255, 0), 5); // Green
+  colorWipe(&m_led,m_led.Color(0, 0, 255), 5); // Blue
+  colorWipe(&m_led,m_led.Color(255, 255, 255), 5); // white
+  colorWipe(&m_led,m_led.Color(0, 0, 0), 5); // off 
+  colorWipe(&z_led,z_led.Color(255, 0, 0), 50); // Red
+  colorWipe(&z_led,z_led.Color(0, 255, 0), 50); // Green
+  colorWipe(&z_led,z_led.Color(0, 0, 255), 50); // Blue
+  colorWipe(&z_led,z_led.Color(255, 255, 255), 50); // white
+  colorWipe(&z_led,m_led.Color(0, 0, 0), 5); // off 
 }
 
 // Get number of LED 
@@ -91,7 +88,7 @@ uint16_t xy( uint8_t x, uint8_t y)
   return i;
 }
 
-void setMatrix() {
+void setMatrixLED() {
   uint32_t c;
   uint16_t x;
 
@@ -110,15 +107,209 @@ void setMatrix() {
   }
 }
 
+void setText() {
+
+  T_ES;
+  T_IST0;
+
+  if(curman < 5) {
+    if((int)random(2)==0) {
+      // Es is xx Uhr
+      setHourText(curstd == 1?100:curstd); // Ein Uhr
+      T_UHR;
+    }
+    else {
+      // Es ist um xx
+      T_UM;
+      setHourText(curstd);
+    }
+  }
+  else if(curmin < 10 {
+    //00:05	Es ist fünf[0] nach xx
+    T_FUNF0;
+    T_NACH;
+    setHourText(curstd);
+  }
+  else if(curmin < 15 {
+    //00:10	Es ist zehn[1] nach xx
+    T_ZEHN1;
+    T_NACH;
+    setHourText(curstd);
+  }
+  else if(curmin < 20 {
+    //00:15	Es ist viertel nach xx
+    //		Es ist viertel xx+1
+    if((int)random(2)==0) {
+      T_VIERTEL;
+      T_NACH;
+      setHourText(curstd);
+    }
+    else {
+      T_VIERTEL;
+      setHourText(curstd+1);
+    }
+  }
+  else if(curmin < 25 {
+    //00:20	Es ist zwanzig nach xx
+    T_ZWANZIG;
+    T_NACH;
+    setHourText(curstd);
+  }
+  else if(curmin < 30 {
+    //00:25	Es ist fünf[0] vor halb xx+1
+    T_FUNF0;
+    T_VOR;
+    T_HALB;
+    setHourText(curstd+1);
+  }
+  else if(curmin < 35 {
+    //00:30	Es ist halb xx+1
+    T_HALB;
+  }
+  else if(curmin < 40 {
+    //00:35	Es ist fünf[0] nach halb xx+1
+    T_FUNF0;
+    T_NACH;
+    T_HALB;
+    setHourText(curstd+1);
+  }
+  else if(curmin < 45 {
+    //00:40	Es ist zwanzig vor xx+1
+    T_ZWANZIG;
+    T_VOR;
+    setHourText(curstd+1);
+  }
+  else if(curmin < 50 {
+    //00:45	Es ist viertel vor xx+1
+    //		Es ist dreiviertel xx+1
+    if((int)random(2)==0) {
+      T_VIERTEL;
+      T_VOR;
+      setHourText(curstd+1);
+    }
+    else {
+      T_DREIVIERTEL;
+      setHourText(curstd+1);
+    }
+  }
+  else if(curmin < 55 {
+    //00:50	Es ist zehn[1] vor xx+1
+    T_ZEHN1;
+    T_VOR;
+    setHourText(curstd+1);
+  }
+  else {
+    //00:55	Es ist fünf[0] vor xx+1
+    T_FUNF0;
+    T_VOR;
+    setHourText(curstd+1);
+  }
+}
+
+void setHour(unit8_t h) {
+  switch(h) {
+    case 0:
+    case 12:
+      T_ZWOLF;
+      break;
+    case 1:
+      T_EINS;
+      break;
+    case 100:
+      T_EIN;
+      break;
+    case 2:
+      T_ZWEI;
+      break;
+    case 3:
+      T_DREI6;
+      break;
+    case 4:
+      T_VIER7;
+      break;
+    case 5:
+      T_FUNF4;
+      break;
+    case 6:
+      T_SECHS;
+      break;
+    case 7:
+      T_SIEBEN;
+      break;
+    case 8:
+      T_ACHT;
+      break;
+    case 9:
+      T_NEUN;
+      break;
+    case 10:
+      T_ZEHN9;
+      break;
+    case 11:
+      T_ELF;
+      break;
+  }
+}
+
+void setZLED() {
+  uint8_t x=0;
+  uint32_t c=0;
+  for(int i=0;i<5);i++) {
+    x=bitRead(curzled,5-j);
+    c=z_led.Color(255, 255, 255); // ersetzen mit funktion für farbmodus
+    if(x == 1) {
+      z_led.setPixelColor(i,c);
+    }
+    else {
+      z_led.setPixelColor(i,0);
+    }
+  }
+}
+
+setMin() {
+  curzled=curzled & T_ST; //status behalten, rest zurücksetzen
+  switch(curmin % 5) {
+    case 1:
+      curzled |= T_M1;
+      break;
+    case 2:
+      curzled |= T_M2;
+      break;
+    case 3:
+      curzled |= T_M3;
+      break;
+    case 4:
+      curzled |= T_M4;
+      break;
+  }
+}
+
 void loop() {
-  colorWipe(&m_led,m_led.Color(255, 0, 0), 5); // Red
-  colorWipe(&m_led,m_led.Color(0, 255, 0), 5); // Green
-  colorWipe(&m_led,m_led.Color(0, 0, 255), 5); // Blue
-  colorWipe(&m_led,m_led.Color(255, 255, 255), 5); // white
-  colorWipe(&z_led,z_led.Color(255, 0, 0), 50); // Red
-  colorWipe(&z_led,z_led.Color(0, 255, 0), 50); // Green
-  colorWipe(&z_led,z_led.Color(0, 0, 255), 50); // Blue
-  colorWipe(&z_led,z_led.Color(255, 255, 255), 50); // white
+
+  //Test
+  delay(1000);
+  curmin+=1;
+  if(curmin>=60) {
+    curmin=0;
+    curstd+=1;
+    if(curstd>=12) {
+      curstd=0;
+    }
+  }
+
+  if(curstd != oldstd || curmin != oldmin) {
+    setText();
+    setMin();
+    setMatrixLED();
+    oldstd=curstd;
+    oldmin=curmin;
+    m_led.show();
+  }
+  if(curzled != oldzled) {
+    setZLED();
+    oldzled=curzled;
+    z_led.show();
+  }
 }
 
 // Fill the dots one after the other with a color
