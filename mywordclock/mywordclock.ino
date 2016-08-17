@@ -10,6 +10,10 @@
 #define M_HEIGHT 10
 #define Z_LEDS 5
 
+#define MINBRIGHT 100
+#define MAXBRIGHT 255
+
+
 // texte
 #define T_ES          line[0] |= 0b1100000000000000
 #define T_IST0        line[0] |= 0b0001110000000000
@@ -305,7 +309,7 @@ void loop() {
 Serial.println(analogRead(PIN_LDR)/4);
 #endif
 
-  curbright=analogRead(PIN_LDR)/4;  // Noch optimieren wenn gehäuse fertig ist
+  curbright = MINBRIGHT+(MAXBRIGHT-MINBRIGHT)*analogRead(PIN_LDR)/1023;
 
   curmin+=1;
   if(curmin>=60) {
