@@ -2,7 +2,8 @@
 #include <Time.h>
 #include <DCF77.h>
 
-#define DEBUG ja
+//#define DEBUG ja
+#undef DEBUG
 
 #define PIN_MLED  6
 #define PIN_ZLED  7
@@ -14,8 +15,8 @@
 #define M_HEIGHT 10
 #define Z_LEDS 5
 
-#define MINBRIGHT 100
-#define MAXBRIGHT 255
+#define MINBRIGHT 100.0
+#define MAXBRIGHT 255.0
 
 
 // texte
@@ -94,7 +95,10 @@ void setup() {
   setZLED();
   z_led.show();
 
-  DCF.Start();
+
+  setTime(20,07,0,18,8,2016);
+  //setTime(hr,min,sec,day,month,yr);
+/*  DCF.Start();
   setSyncInterval(30);
   setSyncProvider(DCF.getTime);
 
@@ -114,7 +118,90 @@ void setup() {
   } 
   oldstatus_color=curstatus_color=z_led.Color(0,255,0);
   setZLED();
-  z_led.show();
+  z_led.show();*/
+}
+
+void loop() {
+
+  int16_t diff=0;
+  //Test
+  delay(100);
+
+  curbright = (int)(MINBRIGHT+(MAXBRIGHT-MINBRIGHT)*analogRead(PIN_LDR)/1023.0);
+  diff = oldbright - curbright;
+  if(diff<0) { diff = diff * -1; }
+#ifdef DEBUG
+Serial.print(oldbright);
+Serial.print(" : ");
+Serial.print(curbright);
+Serial.print(" : ");
+Serial.println(diff);
+#endif
+
+  time=now();
+  curmin=minute(time);
+  curstd=hourFormat12(time);
+  cursec=second(time);
+/*
+  if(timeStatus() == timeNotSet) {  
+    if(digitalRead(PIN_DCF) == 1) {
+      curstatus_color = z_led.Color(255,0,255);
+    }
+    else {
+      curstatus_color = z_led.Color(255,0,0);
+    }
+  } 
+  else {
+    if(digitalRead(PIN_DCF) == 1) {
+      curstatus_color = z_led.Color(0,255,255);
+    }
+    else {
+      curstatus_color = z_led.Color(0,255,0);
+    }
+  } 
+*/
+  
+  curzled = (curzled & T_M4) | ((cursec % 2) * T_ST);
+  
+  if(curstd != oldstd || curmin != oldmin) {  // eigentlich nur alle %5 minuten; nicht neuzeichnen bei leichten helligkeitsschwankungen
+    setText();
+    setMin();
+    setMatrixLED();
+    m_led.setBrightness(curbright);
+    oldstd=curstd;
+    oldmin=curmin;
+    m_led.show();
+  } else if (diff > 10) {
+#ifdef DEBUG
+Serial.print(oldbright);
+Serial.print(" m ");
+Serial.print(curbright);
+Serial.print(" m ");
+Serial.println(diff);
+#endif
+    m_led.setBrightness(curbright);
+    m_led.show();
+  }
+  if(curzled != oldzled || curstatus_color != oldstatus_color) {
+    setZLED();
+    z_led.setBrightness(curbright);
+    oldzled=curzled;
+    oldbright=curbright;
+    oldstatus_color=curstatus_color;
+    z_led.show();
+  } else if (diff > 10) {
+#ifdef DEBUG
+Serial.print(oldbright);
+Serial.print(" z ");
+Serial.print(curbright);
+Serial.print(" z ");
+Serial.println(diff);
+#endif
+    oldbright=curbright;
+    z_led.setBrightness(curbright);
+    z_led.show();
+  }
+
 }
 
 // Get number of LED in matrix
@@ -133,7 +220,8 @@ void setMatrixLED() {
   for(int i=0; i<=9; i++) { // zeile
     for(int j=0; j<=15; j++) { // spalte
       x=bitRead(line[i],15-j);
-      c=m_led.Color(255, 255, 255); // ersetzen mit funktion für farbmodus
+      c=ctimeOfDay(&m_led);
+      //c=m_led.Color(255, 255, 255); // ersetzen mit funktion für farbmodus
       if(x == 1) {
         m_led.setPixelColor(xy(j,i),c);
       }
@@ -299,7 +387,8 @@ void setZLED() {
       c=curstatus_color;
     }
     else {
-      c=z_led.Color(255, 255, 255); // ersetzen mit funktion für farbmodus
+      c=ctimeOfDay(&z_led);
+      //c=z_led.Color(255, 255, 255); // ersetzen mit funktion für farbmodus
     }
     if(x == 1) {
       z_led.setPixelColor(i,c);
@@ -328,67 +417,6 @@ void setMin() {
   }
 }
 
-void loop() {
-
-  //Test
-  delay(100);
-
-  curbright = MINBRIGHT+(MAXBRIGHT-MINBRIGHT)*analogRead(PIN_LDR)/1023;
-
-  time=now();
-  curmin=minute(time);
-  curstd=hour(time);
-  cursec=second(time);
-
-  if(timeStatus() == timeNotSet) {  
-    if(digitalRead(PIN_DCF) == 1) {
-      curstatus_color = z_led.Color(255,0,255);
-    }
-    else {
-      curstatus_color = z_led.Color(255,0,0);
-    }
-  } 
-  else {
-    if(digitalRead(PIN_DCF) == 1) {
-      curstatus_color = z_led.Color(0,255,255);
-    }
-    else {
-      curstatus_color = z_led.Color(0,255,0);
-    }
-  } 
-
-
-/*
-  if(curmin>=60) {
-    curmin=0;
-    curstd+=1;
-    if(curstd>=12) {
-      curstd=0;
-    }
-  }
-*/
-
-
-  if(curstd != oldstd || curmin != oldmin || abs(oldbright-curbright) > 10) {  // eigentlich nur alle %5 minuten; nicht neuzeichnen bei leichten helligkeitsschwankungen
-    setText();
-    setMin();
-    setMatrixLED();
-    m_led.setBrightness(curbright);
-    oldstd=curstd;
-    oldmin=curmin;
-    m_led.show();
-  }
-  if(curzled != oldzled || abs(oldbright-curbright) > 10 || curstatus_color != oldstatus_color) {
-    setZLED();
-    z_led.setBrightness(curbright);
-    oldzled=curzled;
-    oldbright=curbright;
-    oldstatus_color=curstatus_color;
-    z_led.show();
-  }
-
-}
-
 // Fill the dots one after the other with a color
 void colorWipe(Adafruit_NeoPixel *strip,uint32_t c, uint8_t wait) {
   for(uint16_t i=0; i<strip->numPixels(); i++) {
@@ -397,4 +425,26 @@ void colorWipe(Adafruit_NeoPixel *strip,uint32_t c, uint8_t wait) {
     delay(wait);
   }
 }
+
+// ein tag hat 288 5min intervalle
+// 96 + 96 + 96
+// 0,255,0 --> 0,0,255  schrittweite 2,65625
+// 0,0,255 --> 255,0,0
+// 255,0,0 --> 0,255,0
+uint32_t ctimeOfDay(Adafruit_NeoPixel *strip) {
+
+  int iOfDay=hour()*60+minute()/5;
+  float s=2.65625;
+  
+  if(iOfDay < 96) {
+    return strip->Color(255 - iOfDay * s, 0, iOfDay * s);
+  }
+  if(iOfDay < 2*96) {
+    iOfDay -= 96;
+    return strip->Color(0, iOfDay * s, 255 - iOfDay * s);
+  }
+  iOfDay -= 2*96;
+  return strip->Color(iOfDay * s, 255 - iOfDay * s, 0);
+}
+
 
