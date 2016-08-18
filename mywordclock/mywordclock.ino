@@ -1,10 +1,14 @@
 #include <Adafruit_NeoPixel.h>
+#include <Time.h>
+#include <DCF77.h>
 
 #define DEBUG ja
 
 #define PIN_MLED  6
 #define PIN_ZLED  7
 #define PIN_LDR   A0  // Analog
+#define PIN_DCF   2
+#define DCF_INTERRUPT 0  // Interrupt number associated with PIN_DCF
 
 #define M_WIDTH 11
 #define M_HEIGHT 10
@@ -61,16 +65,20 @@ uint16_t line[10] = { 0,0,0,0,0,0,0,0,0,0 };
 
 uint8_t curstd=0, oldstd=0;
 uint8_t curmin=0, oldmin=0;
+uint8_t cursec=0, oldsec=0;
 uint8_t curzled=0, oldzled=0;
 uint16_t curbright=0, oldbright=0;
-uint32_t status_color=0;
+uint32_t curstatus_color=0, oldstatus_color=0;
+
+time_t time;
+DCF77 DCF = DCF77(PIN_DCF,DCF_INTERRUPT);
 
 void setup() {
   
   #ifdef DEBUG
   Serial.begin(9600);  //Begin serial communcation
   #endif
-  
+
   m_led.begin();
   m_led.show(); // Initialize all pixels to 'off'
   z_led.begin();
@@ -81,15 +89,35 @@ void setup() {
   colorWipe(&z_led,z_led.Color(255, 255, 255), 50); // white
   colorWipe(&z_led,m_led.Color(0, 0, 0), 50); // off 
 
-  status_color=z_led.Color(255,0,0); // nur status LED auf rot
+  curstatus_color=z_led.Color(255,0,0); // nur status LED auf rot
   curzled = T_ST;
   setZLED();
   z_led.show();
 
-  //jetzt den zeitsync und so...
+  DCF.Start();
+  setSyncInterval(30);
+  setSyncProvider(DCF.getTime);
+
+  // wait until the time is set by the sync provider      
+  while(timeStatus() == timeNotSet) {  
+    if(digitalRead(PIN_DCF) == 1) {
+      curstatus_color = z_led.Color(255,0,255);
+    }
+    else {
+      curstatus_color = z_led.Color(255,0,0);
+    }
+    if(curstatus_color != oldstatus_color) {
+      oldstatus_color=curstatus_color;
+      setZLED();
+      z_led.show();
+    }
+  } 
+  oldstatus_color=curstatus_color=z_led.Color(0,255,0);
+  setZLED();
+  z_led.show();
 }
 
-// Get number of LED 
+// Get number of LED in matrix
 uint16_t xy( uint8_t x, uint8_t y)
 {
   uint16_t i;
@@ -268,7 +296,7 @@ void setZLED() {
   for(int i=0;i<5;i++) {
     x=bitRead(curzled,7-i);
     if(i==2) {
-      c=status_color;
+      c=curstatus_color;
     }
     else {
       c=z_led.Color(255, 255, 255); // ersetzen mit funktion für farbmodus
@@ -303,15 +331,34 @@ void setMin() {
 void loop() {
 
   //Test
-  delay(1000);
-
-#ifdef DEBUG
-Serial.println(analogRead(PIN_LDR)/4);
-#endif
+  delay(100);
 
   curbright = MINBRIGHT+(MAXBRIGHT-MINBRIGHT)*analogRead(PIN_LDR)/1023;
 
-  curmin+=1;
+  time=now();
+  curmin=minute(time);
+  curstd=hour(time);
+  cursec=second(time);
+
+  if(timeStatus() == timeNotSet) {  
+    if(digitalRead(PIN_DCF) == 1) {
+      curstatus_color = z_led.Color(255,0,255);
+    }
+    else {
+      curstatus_color = z_led.Color(255,0,0);
+    }
+  } 
+  else {
+    if(digitalRead(PIN_DCF) == 1) {
+      curstatus_color = z_led.Color(0,255,255);
+    }
+    else {
+      curstatus_color = z_led.Color(0,255,0);
+    }
+  } 
+
+
+/*
   if(curmin>=60) {
     curmin=0;
     curstd+=1;
@@ -319,7 +366,9 @@ Serial.println(analogRead(PIN_LDR)/4);
       curstd=0;
     }
   }
-  
+*/
+
+
   if(curstd != oldstd || curmin != oldmin || abs(oldbright-curbright) > 10) {  // eigentlich nur alle %5 minuten; nicht neuzeichnen bei leichten helligkeitsschwankungen
     setText();
     setMin();
@@ -329,11 +378,12 @@ Serial.println(analogRead(PIN_LDR)/4);
     oldmin=curmin;
     m_led.show();
   }
-  if(curzled != oldzled || abs(oldbright-curbright) > 10) {
+  if(curzled != oldzled || abs(oldbright-curbright) > 10 || curstatus_color != oldstatus_color) {
     setZLED();
     z_led.setBrightness(curbright);
     oldzled=curzled;
     oldbright=curbright;
+    oldstatus_color=curstatus_color;
     z_led.show();
   }
 
