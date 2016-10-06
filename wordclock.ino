@@ -26,11 +26,14 @@
 #include <Timezone.h>
 #include <Adafruit_NeoPixel.h>
 
-
 #define DEBUG ja 
 #define DEBUGLOG(arg) Serial.print("*** [");Serial.print((const char*)__FUNCTION__);Serial.print("] ");Serial.print(arg);Serial.print(" ***\r\n");
 
+// WLAN Credentials
+// #define SSID        "your SSID"
+// #define PASSWORD    "your Password"
 #include "WLAN_cred.h";
+// ESP8266 Connection settings
 #define RXPIN       11
 #define TXPIN       12
 #define ESPBAUD     19200
@@ -172,7 +175,7 @@ void ESP8266mini::serialFlush(void) {
 #ifdef DEBUG
   DEBUGLOG("start")
 #endif
-  uint8_t t;
+    uint8_t t;
   while(esp_uart->available() > 0) {
     t = esp_uart->read();
   }
@@ -301,7 +304,8 @@ uint8_t curzled=0; // zwischenminuten
 //uint8_t oldzled=0;
 uint32_t stcolor=0; // farbe statusled
 
-uint16_t matrix_line[10] = { 0,0,0,0,0,0,0,0,0,0 };
+uint16_t matrix_line[10] = { 
+  0,0,0,0,0,0,0,0,0,0 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Setup
@@ -404,7 +408,7 @@ void setup(void)
     Serial.print("time set\r\n");
     stcolor=z_led.Color(255,255,255);
   }
-  
+
   curtime=now();
   setText();
 
@@ -447,15 +451,15 @@ void setup(void)
         curzled |= T_M4;
         break;
       }
-    stcolor=z_led.Color(255,255,0);
-    if(wifi.getTime(&t_tz)<0) {
-      Serial.print("Error\r\n");
-      stcolor=z_led.Color(255,0,0);
-    }
-    else {
-      Serial.print("time set\r\n");
-      stcolor=z_led.Color(255,255,255);
-    }
+      stcolor=z_led.Color(255,255,0);
+      if(wifi.getTime(&t_tz)<0) {
+        Serial.print("Error\r\n");
+        stcolor=z_led.Color(255,0,0);
+      }
+      else {
+        Serial.print("time set\r\n");
+        stcolor=z_led.Color(255,255,255);
+      }
 
       if(minute(curtime) %5 == 0) {
         setText();
@@ -493,7 +497,7 @@ uint16_t xy( uint8_t x, uint8_t y)
 // Matrix LED setzen aus array 'line[]'
 void setMLED() {
 #ifdef DEBUG
-DEBUGLOG("start");  
+  DEBUGLOG("start");  
 #endif
   uint32_t c;
   uint16_t x;
@@ -511,7 +515,7 @@ DEBUGLOG("start");
     }
   }
 #ifdef DEBUG
-DEBUGLOG("end");  
+  DEBUGLOG("end");  
 #endif
 }
 
@@ -520,7 +524,7 @@ DEBUGLOG("end");
 // bei mehr schreibweisen entscheidet der zufall
 void setText() {
 #ifdef DEBUG
-DEBUGLOG("start");  
+  DEBUGLOG("start");  
 #endif
 
   //matrix-lines reset
@@ -626,7 +630,7 @@ DEBUGLOG("start");
     setHourText(hourFormat12(curtime)+1);
   }
 #ifdef DEBUG
-DEBUGLOG("end");  
+  DEBUGLOG("end");  
 #endif
 }
 
@@ -636,46 +640,46 @@ DEBUGLOG("end");
 void setHourText(uint8_t h) {
   h %= 12;
   switch(h) {
-    case 0:
-    case 12:
-      T_ZWOLF;
-      break;
-    case 1:
-      T_EINS;
-      break;
-    case 100:
-      T_EIN;
-      break;
-    case 2:
-      T_ZWEI;
-      break;
-    case 3:
-      T_DREI6;
-      break;
-    case 4:
-      T_VIER7;
-      break;
-    case 5:
-      T_FUNF4;
-      break;
-    case 6:
-      T_SECHS;
-      break;
-    case 7:
-      T_SIEBEN;
-      break;
-    case 8:
-      T_ACHT;
-      break;
-    case 9:
-      T_NEUN;
-      break;
-    case 10:
-      T_ZEHN9;
-      break;
-    case 11:
-      T_ELF;
-      break;
+  case 0:
+  case 12:
+    T_ZWOLF;
+    break;
+  case 1:
+    T_EINS;
+    break;
+  case 100:
+    T_EIN;
+    break;
+  case 2:
+    T_ZWEI;
+    break;
+  case 3:
+    T_DREI6;
+    break;
+  case 4:
+    T_VIER7;
+    break;
+  case 5:
+    T_FUNF4;
+    break;
+  case 6:
+    T_SECHS;
+    break;
+  case 7:
+    T_SIEBEN;
+    break;
+  case 8:
+    T_ACHT;
+    break;
+  case 9:
+    T_NEUN;
+    break;
+  case 10:
+    T_ZEHN9;
+    break;
+  case 11:
+    T_ELF;
+    break;
   }
 }
 
@@ -773,3 +777,4 @@ void colorWheel(Adafruit_NeoPixel *strip, uint8_t wait) {
     delay(wait);
   }
 }
+
