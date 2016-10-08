@@ -1,8 +1,10 @@
 /**
- * Wörteruhr
- * Autor: Christian Pohl
- * Version 0.1
+ * Wordclock (German)
+ * Author: Christian Pohl
+ * https://github.com/ZappZaraZupp
+ * Version 0.1 2016-10-06
  *
+ * Libraries used:
  * ESP8266 Firmware:
  * https://github.com/itead/ITEADLIB_Arduino_WeeESP8266
  * NTP Firmware
@@ -40,8 +42,10 @@
 
 // PINs
 #define PIN_MLED  6
-#define PIN_ZLED  7
+#define PIN_ZLED  7 
 #define PIN_LDR   A0  // Analog
+#define PIN_COLM  8   // Colormode
+#define PIN_DSIP  9   // Displaymode
 
 // einige Konstanten
 #define M_WIDTH 11
@@ -210,7 +214,6 @@ void ESP8266mini::serialFlush(void) {
   }
 
 // getTime from NTP and set system time NTP Setting of ESP is GMT0
-// German Summertime-rules are applied
 int ESP8266mini::getTime(Timezone *tz) {
 #ifdef DEBUG
   DEBUGLOG("start")
@@ -293,19 +296,18 @@ Timezone t_tz(t_dst,t_st);
 Adafruit_NeoPixel m_led = Adafruit_NeoPixel(M_WIDTH * M_HEIGHT, PIN_MLED, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel z_led = Adafruit_NeoPixel(Z_LEDS, PIN_ZLED, NEO_GRB + NEO_KHZ800);
 
-uint8_t colormode=2;
+uint8_t colormode=1;
 time_t curtime;
 time_t oldtime;
 
-uint8_t curbright=0; // Helligkeit
-//uint8_t oldbright=0;
+uint8_t curbright=0; // Brightness for LED
+uint8_t curzled=0;   // Minutes in 5 min interval and status LED
+uint32_t stcolor=0;  // color statusled
 
-uint8_t curzled=0; // zwischenminuten
-//uint8_t oldzled=0;
-uint32_t stcolor=0; // farbe statusled
-
-uint16_t matrix_line[10] = { 
+uint16_t matrix_line[10] = { // array for Matrix, bit=0: LED off, bit=1 LED on
   0,0,0,0,0,0,0,0,0,0 };
+
+uint8_t prevkey=0;  // flag, if key was pressed in last loop
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Setup
@@ -429,14 +431,36 @@ void setup(void)
     if (Serial.available())
       esp8266.write(Serial.read());
 
-    // Helligkeit einlesen
+/*
+    // color mode
+    if(digitalRead(PIN_COLM)==1 && prevkey == 0 ) {
+      if(prevkey == 0) {  
+        prevkey = 1;
+        colormode=(colormode+1)%3;  // currently 3 color modes
+      }
+    } else {
+      prevkey = 0;
+    }
+*/
+/*
+    // display mode
+    if(digitalRead(PIN_DISP)==1 && prevkey == 0 ) {
+      if(prevkey == 0) {  
+        prevkey = 1;
+        displaymode=(displaymode+1)%3;
+      }
+    } else {
+      prevkey = 0;
+    }
+*/    
+    // Read brightness
     curbright = (int)(MINBRIGHT+(MAXBRIGHT-MINBRIGHT)*analogRead(PIN_LDR)/1023.0);
 
-    curtime=now(); // aktuelle zeit
+    curtime=now(); // store current time
 
-    // Minute geändert
+    // Minute has changed
     if(minute(curtime) != minute(oldtime)) {
-      curzled=curzled & T_ST; //status behalten, rest zurücksetzen
+      curzled=curzled & T_ST; // keep status LED, reset minute LED
       switch(minute(curtime) % 5) {
       case 1:
         curzled |= T_M1;
@@ -452,7 +476,7 @@ void setup(void)
         break;
       }
       stcolor=z_led.Color(255,255,0);
-      if(wifi.getTime(&t_tz)<0) {
+      if(wifi.getTime(&t_tz)<0) {  // call ESP8266 for time
         Serial.print("Error\r\n");
         stcolor=z_led.Color(255,0,0);
       }
@@ -461,15 +485,15 @@ void setup(void)
         stcolor=z_led.Color(255,255,255);
       }
 
-      if(minute(curtime) %5 == 0) {
+      if(minute(curtime) %5 == 0) {  // 5 minutes intrerval --> new text
         setText();
       }
     }
 
-    //refresh jede sekunde
+    // refresh every second
     if(second(curtime) != second(oldtime)) {
-      // sekundenblinken statusled
-      curzled = (curzled & T_M4) | ((second(curtime) % 2) * T_ST);  // Minuten behalten, status setzen
+      // blink statusLED
+      curzled = (curzled & T_M4) | ((second(curtime) % 2) * T_ST);  // keep minutes, set statusLED
 
       oldtime=curtime;
       setMLED();
@@ -484,7 +508,7 @@ void setup(void)
 
 
 /////////////////////////////////////
-// LED nummer aus matrixkoordinaten
+// get LED number from x,y
 uint16_t xy( uint8_t x, uint8_t y)
 {
   uint16_t i;
@@ -494,7 +518,7 @@ uint16_t xy( uint8_t x, uint8_t y)
 }
 
 /////////////////////////////////////
-// Matrix LED setzen aus array 'line[]'
+// set LED from array 'line[]'
 void setMLED() {
 #ifdef DEBUG
   DEBUGLOG("start");  
@@ -502,8 +526,8 @@ void setMLED() {
   uint32_t c;
   uint16_t x;
 
-  for(int i=0; i<=9; i++) { // zeile
-    for(int j=0; j<=15; j++) { // spalte
+  for(int i=0; i<=9; i++) { // row
+    for(int j=0; j<=15; j++) { // column
       x=bitRead(matrix_line[i],15-j);
       c=mcolor(j,i);
       if(x == 1) {
@@ -520,8 +544,8 @@ void setMLED() {
 }
 
 /////////////////////////////////////
-// Texte aus aktueller zeit setzen
-// bei mehr schreibweisen entscheidet der zufall
+// set text
+// if more writings are possible, random
 void setText() {
 #ifdef DEBUG
   DEBUGLOG("start");  
@@ -539,7 +563,7 @@ void setText() {
   if(minute(curtime) < 5) {
     if((int)random(2)==0) {
       // Es is xx Uhr
-      setHourText(hourFormat12(curtime) == 1?100:hourFormat12(curtime)); // Ein Uhr
+      setHourText(hourFormat12(curtime) == 1 ? 100 : hourFormat12(curtime) ); // "Es ist Ein Uhr" (nicht: "Es ist Eins Uhr" ;-)
       T_UHR;
     }
     else {
@@ -635,10 +659,11 @@ void setText() {
 }
 
 /////////////////////////////////////
-// Stundentext
-// sonderfall: es ist ein uhr
+// hours text
 void setHourText(uint8_t h) {
-  h %= 12;
+  if(h<100) { // >=100 special cases
+    h %= 12;
+  }
   switch(h) {
   case 0:
   case 12:
@@ -646,9 +671,6 @@ void setHourText(uint8_t h) {
     break;
   case 1:
     T_EINS;
-    break;
-  case 100:
-    T_EIN;
     break;
   case 2:
     T_ZWEI;
@@ -680,14 +702,17 @@ void setHourText(uint8_t h) {
   case 11:
     T_ELF;
     break;
+  // specail cases
+  case 100:
+    T_EIN;
+    break;
   }
 }
 
 
 
 /////////////////////////////////////
-// zLED aus curzled setzen
-// sonderbehandlung status LED
+// set zLED 
 void setZLED() {
   uint8_t x=0;
   uint32_t c=0;
@@ -697,7 +722,7 @@ void setZLED() {
       c=stcolor;
     }
     else {
-      c=zcolor(i>2?i-1:i); // zminuten sind index 0,1,3,4 aber für farbe muss es 0,1,2,3 sein
+      c=zcolor(i>2?i-1:i); // minutes are index 0,1,3,4
     }
     if(x == 1) {
       z_led.setPixelColor(i,c);
@@ -709,21 +734,21 @@ void setZLED() {
 }
 
 /////////////////////////////////////
-// farbfunktion(en)
-uint32_t mcolor(uint8_t x, uint8_t y) { // farbfunktion für Matrix
+// colorfunctions
+uint32_t mcolor(uint8_t x, uint8_t y) { // matrix
   switch(colormode) {
   case 0:
   default:
     return m_led.Color(255,255,255);
   case 1:
-    return colorwheel(&m_led,110,(xy(x,y)+(int)(minute(curtime)/60.0*110.0))%110); // ein farbzcylus jede stunde 
+    return colorwheel(&m_led,110,(xy(x,y)+(int)(minute(curtime)/60.0*110.0))%110); // go through cycle ones every hour 
   case 2:
     int iOfDay=(int)(hour(curtime)*60.0+minute(curtime));
-    return colorwheel(&m_led,1440,iOfDay); // ein tag hat 1440 minuten
+    return colorwheel(&m_led,1440,iOfDay); // go through cycle onece every day
   }
 }
 
-uint32_t zcolor(uint8_t i) { // farbfunktion für minuten
+uint32_t zcolor(uint8_t i) { // minutes
   switch(colormode) {
   case 0:
   default:
@@ -732,18 +757,18 @@ uint32_t zcolor(uint8_t i) { // farbfunktion für minuten
     return colorwheel(&z_led,4,(i+(int)(minute(curtime)/60.0*4.0))%4); 
   case 2:
     int iOfDay=(int)(hour(curtime)*60.0+minute(curtime));
-    return colorwheel(&z_led,1440,iOfDay); // ein tag hat 1440 minuten
+    return colorwheel(&z_led,1440,iOfDay);
   }
 }
 
-// farbrad
+// colorwheel
 // 255,0,0 --> 0,255,0
 // 0,255,0 --> 0,0,255
 // 0,0,255 --> 255,0,0
 uint32_t colorwheel(Adafruit_NeoPixel *strip, uint8_t wheelsteps, uint8_t curstep) {
 
   float p=wheelsteps/3.0;
-  float s=255.0/p; // schrittweite
+  float s=255.0/p; // stepsize
 
   // 255,0,0 --> 0,255,0
   if(curstep < p) {
