@@ -46,8 +46,8 @@
 #define PIN_MLED  6
 #define PIN_ZLED  7 
 #define PIN_LDR   A0  // Analog
-#define PIN_COLM  8   // Colormode
-#define PIN_DSIP  9   // Displaymode
+#define PIN_DSIP  8   // Displaymode
+#define PIN_COLM  9   // Colormode
 
 // einige Konstanten
 #define M_WIDTH 11
@@ -122,7 +122,8 @@ uint32_t stcolor=0;  // color statusled
 uint16_t matrix_line[10] = { // array for Matrix, bit=0: LED off, bit=1 LED on
   0,0,0,0,0,0,0,0,0,0 };
 
-uint8_t prevkey=0;  // flag, if key was pressed in last loop
+uint8_t f_colm=0;  // flag, if key was pressed in last loop
+uint8_t f_disp=0;  // flag, if key was pressed in last loop
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Setup
@@ -203,10 +204,12 @@ void setup(void)
     m_led.setPixelColor(3,m_led.Color(0,255,0));
     m_led.show();
     if(sdummy.indexOf("STATUS:5") != -1) {
+      LOG("Connected\r\n");
       m_led.setPixelColor(4,m_led.Color(0,255,0));
       m_led.show();
     }
     else {
+      LOG("NOT Connected\r\n");
       LOG(sdummy.c_str());
       m_led.setPixelColor(4,m_led.Color(255,0,0));
       m_led.show();
@@ -245,28 +248,24 @@ void loop(void)
   if (Serial.available())
     esp8266.write(Serial.read());
 
-  /*
-    // color mode
-   if(digitalRead(PIN_COLM)==1 && prevkey == 0 ) {
-   if(prevkey == 0) {  
-   prevkey = 1;
-   colormode=(colormode+1)%3;  // currently 3 color modes
-   }
-   } else {
-   prevkey = 0;
-   }
-   */
-  /*
-    // display mode
-   if(digitalRead(PIN_DISP)==1 && prevkey == 0 ) {
-   if(prevkey == 0) {  
-   prevkey = 1;
-   displaymode=(displaymode+1)%3;
-   }
-   } else {
-   prevkey = 0;
-   }
-   */
+
+  // color mode
+  // only switch, if key is pressed for more than 10 loops
+  if(digitalRead(PIN_COLM) == 1) {
+    if(f_colm == 10) {
+      colormode=(colormode+1)%3;  // currently 3 color modes
+      LOG(String(("Switch color mode to ")+String(colormode)).c_str());
+    }
+    if(f_colm <= 10) { 
+      f_colm += 1;
+    }
+  }
+  else {
+    if(f_colm > 0) {
+      f_colm -= 1;
+    }
+  }
+
   // Read brightness
   curbright = (int)(MINBRIGHT+(MAXBRIGHT-MINBRIGHT)*analogRead(PIN_LDR)/1023.0);
 
@@ -555,7 +554,7 @@ uint32_t zcolor(uint8_t i) { // minutes
   default:
     return z_led.Color(255,255,255);
   case 1:
-    return colorwheel(&z_led,4,(i+(int)(minute(curtime)/60.0*4.0))%4); 
+    return colorwheel(&z_led,110,((int)(minute(curtime)/60.0*110.0))%110); // same color as 1st led of matrix 
   case 2:
     int iOfDay=(int)(hour(curtime)*60.0+minute(curtime));
     return colorwheel(&z_led,1440,iOfDay);
@@ -603,4 +602,6 @@ void colorWheel(Adafruit_NeoPixel *strip, uint8_t wait) {
     delay(wait);
   }
 }
+
+
 
