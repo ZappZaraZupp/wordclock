@@ -43,17 +43,18 @@
 #define ESPBAUD     19200
 
 // PINs
-#define PIN_MLED  6
-#define PIN_ZLED  7 
+#define PIN_MLED  7
+#define PIN_ZLED  6 
 #define PIN_LDR   A0  // Analog
-#define PIN_DSIP  8   // Displaymode
-#define PIN_COLM  9   // Colormode
+#define PIN_MODE   8   // Displaymode
+#define PIN_COLUP  9   // Colormode
+#define PIN_COLDN  10   // Colormode
 
 // einige Konstanten
 #define M_WIDTH 11
 #define M_HEIGHT 10
 #define Z_LEDS 5
-#define MINBRIGHT 50.0
+#define MINBRIGHT 10.0
 #define MAXBRIGHT 255.0
 
 //ZLED
@@ -108,12 +109,13 @@ TimeChangeRule t_st = {
   "MEZ", Last, Sun, Oct, 3, +60}; // Winter +1h
 Timezone t_tz(t_dst,t_st);
 
-Adafruit_NeoPixel m_led = Adafruit_NeoPixel(M_WIDTH * M_HEIGHT, PIN_MLED, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel z_led = Adafruit_NeoPixel(Z_LEDS, PIN_ZLED, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel m_led = Adafruit_NeoPixel(M_WIDTH * M_HEIGHT, PIN_MLED, NEO_GRBW + NEO_KHZ800);
+Adafruit_NeoPixel z_led = Adafruit_NeoPixel(Z_LEDS, PIN_ZLED, NEO_GRBW + NEO_KHZ800);
 
 uint8_t colormode=1;
 time_t curtime;
 time_t oldtime;
+uint8_t f_timesync=0;
 
 uint8_t curbright=0; // Brightness for LED
 uint8_t curzled=0;   // Minutes in 5 min interval and status LED
@@ -122,8 +124,11 @@ uint32_t stcolor=0;  // color statusled
 uint16_t matrix_line[10] = { // array for Matrix, bit=0: LED off, bit=1 LED on
   0,0,0,0,0,0,0,0,0,0 };
 
-uint8_t f_colm=0;  // flag, if key was pressed in last loop
-uint8_t f_disp=0;  // flag, if key was pressed in last loop
+uint8_t f_colup=0;  // flag, if key was pressed in last loop
+uint8_t f_coldn=0;  // flag, if key was pressed in last loop
+uint8_t f_mode=0;  // flag, if key was pressed in last loop
+
+unsigned long t_colup=0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Setup
@@ -139,18 +144,26 @@ void setup(void)
 
   LOG("Init LEDs");
   m_led.begin();
+  m_led.setBrightness(255);
   m_led.show(); // Initialize all pixels to 'off'
   z_led.begin();
+  z_led.setBrightness(255);
   z_led.show(); // Initialize all pixels to 'off'
 
   //Test
-  colorWipe(&m_led,m_led.Color(255, 255, 255), 10); // white
-  colorWheel(&m_led, 10); 
-  colorWipe(&z_led,z_led.Color(255, 255, 255), 50); // white
+  colorWipe(&m_led,m_led.Color(255, 0, 0, 0), 1); 
+  colorWipe(&m_led,m_led.Color(0, 255, 0, 0), 1); 
+  colorWipe(&m_led,m_led.Color(0, 0, 255, 0), 1); 
+  colorWipe(&m_led,m_led.Color(0, 0, 0, 255), 1); 
+  colorWipe(&z_led,z_led.Color(255, 0, 0, 0), 50); 
+  colorWipe(&z_led,z_led.Color(0, 255, 0, 0), 50); 
+  colorWipe(&z_led,z_led.Color(0, 0, 255, 0), 50); 
+  colorWipe(&z_led,z_led.Color(0, 0, 0, 255), 50); 
+  colorWheel(&m_led, 1); 
   colorWheel(&z_led, 50); 
 
   curzled = T_ST;
-  stcolor = z_led.Color(255,0,0); //Status rot
+  stcolor = z_led.Color(255,0,0,0); //Status rot
   setZLED();
   z_led.show();
 
@@ -163,10 +176,10 @@ void setup(void)
   if(wifi.sendAT("RST",sdummy)<0) {
     LOG("RST Error\r\n");
     LOG(sdummy.c_str());
-    m_led.setPixelColor(0,m_led.Color(255,0,0));
+    m_led.setPixelColor(0,m_led.Color(255,0,0,0));
   }
   else {
-    m_led.setPixelColor(0,m_led.Color(0,255,0));
+    m_led.setPixelColor(0,m_led.Color(0,255,0,0));
     LOG("RST ok");
   }
   m_led.show();
@@ -175,10 +188,10 @@ void setup(void)
   if(wifi.sendAT("CWMODE=1",sdummy)<0) {
     LOG("CWMODE=1 Error\r\n");
     LOG(sdummy.c_str());
-    m_led.setPixelColor(1,m_led.Color(255,0,0));
+    m_led.setPixelColor(1,m_led.Color(255,0,0,0));
   }
   else {
-    m_led.setPixelColor(1,m_led.Color(0,255,0));
+    m_led.setPixelColor(1,m_led.Color(0,255,0,0));
     LOG("CWMODE ok");
   }
   m_led.show();
@@ -186,10 +199,10 @@ void setup(void)
   if(wifi.sendAT("CWJAP=\""SSID"\",\""PASSWORD"\"",sdummy)<0) {
     LOG("CWJAP=... Error\r\n");
     LOG(sdummy.c_str());
-    m_led.setPixelColor(2,m_led.Color(255,0,0));
+    m_led.setPixelColor(2,m_led.Color(255,0,0,0));
   }
   else {
-    m_led.setPixelColor(2,m_led.Color(0,255,0));
+    m_led.setPixelColor(2,m_led.Color(0,255,0,0));
     LOG("CWJAP OK");
   }
   m_led.show();
@@ -197,28 +210,28 @@ void setup(void)
   if(wifi.sendAT("CIPSTATUS",sdummy)<0) {
     LOG("CIPSTATUS Error\r\n");
     LOG(sdummy.c_str());
-    m_led.setPixelColor(3,m_led.Color(255,0,0));
+    m_led.setPixelColor(3,m_led.Color(255,0,0,0));
     m_led.show();
   }
   else {
-    m_led.setPixelColor(3,m_led.Color(0,255,0));
+    m_led.setPixelColor(3,m_led.Color(0,255,0,0));
     m_led.show();
     if(sdummy.indexOf("STATUS:5") != -1) {
       LOG("Connected\r\n");
-      m_led.setPixelColor(4,m_led.Color(0,255,0));
+      m_led.setPixelColor(4,m_led.Color(0,255,0,0));
       m_led.show();
     }
     else {
       LOG("NOT Connected\r\n");
       LOG(sdummy.c_str());
-      m_led.setPixelColor(4,m_led.Color(255,0,0));
+      m_led.setPixelColor(4,m_led.Color(255,0,0,0));
       m_led.show();
     }
   }
 
   if(wifi.sendAT("CIPNTP=0",sdummy)<0) {  // CIPNTP=0 returns no standard value with tailing 'OK' sendAT returns -1 because of that.
     LOG(sdummy.c_str());
-    m_led.setPixelColor(5,m_led.Color(255,255,0));
+    m_led.setPixelColor(5,m_led.Color(255,255,0,0));
     m_led.show();
   }
 
@@ -227,7 +240,7 @@ void setup(void)
   }
   else {
     LOG((String("time set: ")+String(now())).c_str());
-    stcolor = z_led.Color(255,255,255); //Status weiss
+    stcolor = z_led.Color(0,0,0,255); //Status weiss
     setZLED();
     z_led.show();
   }
@@ -250,20 +263,23 @@ void loop(void)
 
 
   // color mode
-  // only switch, if key is pressed for more than 10 loops
-  if(digitalRead(PIN_COLM) == 1) {
-    if(f_colm == 10) {
+  // only switch, if key is pressed for more than x loops
+  // perhaps change to sth. with 'millis' ?
+  if(digitalRead(PIN_COLUP) == 1) {
+    if(millis()-t_colup >= 250) {
+      t_colup=millis();
+//    if(f_colup == 255) {
       colormode=(colormode+1)%3;  // currently 3 color modes
       LOG(String(("Switch color mode to ")+String(colormode)).c_str());
-    }
-    if(f_colm <= 10) { 
-      f_colm += 1;
+//      f_colup += 1;
+//    } 
+//    else if(f_colup < 255) { 
+//      f_colup += 1;
     }
   }
   else {
-    if(f_colm > 0) {
-      f_colm -= 1;
-    }
+    t_colup=millis();
+//      f_colup = 0;
   }
 
   // Read brightness
@@ -288,14 +304,21 @@ void loop(void)
       curzled |= T_M4;
       break;
     }
-    stcolor=z_led.Color(255,255,0);
+    //stcolor=z_led.Color(255,255,0,0);
     if(wifi.getTime(&t_tz)<0) {  // call ESP8266 for time
       Serial.print("getTime Error\r\n");
-      stcolor=z_led.Color(255,0,0);
+      //stcolor=z_led.Color(0,0,0,255);
+      f_timesync=0;
     }
     else {
       LOG((String("time set: ")+String(now())).c_str());
-      stcolor=z_led.Color(255,255,255);
+      //stcolor=z_led.Color(0,0,0,255);
+      //stcolor=colorwheel(&z_led,3600,minute(curtime)*60 +second(curtime)); // cycle through colors once every hour
+      if(f_timesync!=1) {
+        f_timesync=1;
+        curtime=now();
+        setText();
+      }
     }
 
     if(minute(curtime) %5 == 0) {  // 5 minutes intrerval --> new text
@@ -306,14 +329,20 @@ void loop(void)
   // refresh every second
   if(second(curtime) != second(oldtime)) {
     // blink statusLED
-    curzled = (curzled & T_M4) | ((second(curtime) % 2) * T_ST);  // keep minutes, set statusLED
+    if(f_timesync==1) {
+      stcolor=colorwheel(&z_led,60,second(curtime)); // cycle through colors once every second
+    }
+    else {
+      stcolor=z_led.Color(255,255,255,255);
+    }
+    curzled = (curzled & T_M4) | (((second(curtime)+1) % 2) * T_ST);  // keep minutes, set statusLED
 
     oldtime=curtime;
-    setMLED();
     m_led.setBrightness(curbright);
+    setMLED();
     m_led.show();
-    setZLED();
     z_led.setBrightness(curbright);
+    setZLED();
     z_led.show();
 
   }
@@ -340,6 +369,7 @@ void setMLED() {
     for(int j=0; j<=15; j++) { // column
       x=bitRead(matrix_line[i],15-j);
       c=mcolor(j,i);
+      //c=setbrightness(mcolor(j,i));
       if(x == 1) {
         m_led.setPixelColor(xy(j,i),c);
       }
@@ -520,9 +550,11 @@ void setZLED() {
     x=bitRead(curzled,7-i);
     if(i==2) {
       c=stcolor;
+//      c=setbrightness(stcolor);
     }
     else {
       c=zcolor(i>2?i-1:i); // minutes are index 0,1,3,4
+//      c=setbrightness(zcolor(i>2?i-1:i)); // minutes are index 0,1,3,4
     }
     if(x == 1) {
       z_led.setPixelColor(i,c);
@@ -539,12 +571,12 @@ uint32_t mcolor(uint8_t x, uint8_t y) { // matrix
   switch(colormode) {
   case 0:
   default:
-    return m_led.Color(255,255,255);
+    return m_led.Color(0,0,0,255);
   case 1:
-    return colorwheel(&m_led,110,(xy(x,y)+(int)(minute(curtime)/60.0*110.0))%110); // go through cycle ones every hour 
+    return colorwheel(&m_led,110,(xy(x,y)+(int)(minute(curtime)/60.0*110.0))%110); // rainbow over matrix, start cycle once every hour
   case 2:
     int iOfDay=(int)(hour(curtime)*60.0+minute(curtime));
-    return colorwheel(&m_led,1440,iOfDay); // go through cycle onece every day
+    return colorwheel(&m_led,1440,iOfDay); // go through cycle once every day whole matrix one color
   }
 }
 
@@ -552,7 +584,7 @@ uint32_t zcolor(uint8_t i) { // minutes
   switch(colormode) {
   case 0:
   default:
-    return z_led.Color(255,255,255);
+    return z_led.Color(0,0,0,255);
   case 1:
     return colorwheel(&z_led,110,((int)(minute(curtime)/60.0*110.0))%110); // same color as 1st led of matrix 
   case 2:
@@ -561,27 +593,27 @@ uint32_t zcolor(uint8_t i) { // minutes
   }
 }
 
-// colorwheel
+// colorwheel RGB 
 // 255,0,0 --> 0,255,0
 // 0,255,0 --> 0,0,255
 // 0,0,255 --> 255,0,0
-uint32_t colorwheel(Adafruit_NeoPixel *strip, uint8_t wheelsteps, uint8_t curstep) {
+uint32_t colorwheel(Adafruit_NeoPixel *strip, uint16_t wheelsteps, uint16_t curstep) {
 
   float p=wheelsteps/3.0;
   float s=255.0/p; // stepsize
 
   // 255,0,0 --> 0,255,0
   if(curstep < p) {
-    return strip->Color(255-curstep*s, curstep*s, 0);
+    return strip->Color(255-curstep*s, curstep*s, 0,0);
   }
   // 0,255,0 --> 0,0,255
   if(curstep < 2*p) {
     curstep -= p;
-    return strip->Color(0, 255-curstep*s, curstep*s);
+    return strip->Color(0, 255-curstep*s, curstep*s,0);
   }
   // 0,0,255 --> 255,0,0
   curstep -= 2*p;
-  return strip->Color(curstep*s,0, 255-curstep*s);
+  return strip->Color(curstep*s,0, 255-curstep*s,0);
 }
 
 /////////////////////////////////////
@@ -602,6 +634,4 @@ void colorWheel(Adafruit_NeoPixel *strip, uint8_t wait) {
     delay(wait);
   }
 }
-
-
 
