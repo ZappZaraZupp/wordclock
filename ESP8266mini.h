@@ -71,7 +71,7 @@ int ESP8266mini::sendAT(char* cmd, String &recv) {
     buf = String("AT+" + String(cmd)+ "\r\n");
   }
 
-  DEBUGLOG(String("Sending: "+buf).c_str())
+  DLOG(String("Sending: "+buf).c_str())
 
   while(esp_uart->available() > 0) {
     c = esp_uart->read();
@@ -96,11 +96,11 @@ int ESP8266mini::sendAT(char* cmd, String &recv) {
     }
     if(recv.indexOf(match) != -1) {
       ret = recv.length();
-      DEBUGLOG(String("match found").c_str());
+      DLOG(String("match found").c_str());
       break;
     }
   }
-  DEBUGLOG(String("received:\r\n-----\r\n"+recv+"\r\n-----\r\n").c_str());
+  DLOG(String("received:\r\n-----\r\n"+recv+"\r\n-----\r\n").c_str());
   return ret;
 }
 
@@ -140,7 +140,7 @@ int ESP8266mini::getTime(Timezone *tz) {
   setTime(tz->toLocal(dtime));
 
   time_t t = now(); // Store the current time in time 
-  DEBUGLOG((String("localtime:\r\n")+String(year(t))+String("-")+String(month(t))+String("-")+String(day(t))+String(" ")+String(hour(t))+String(":")+String(minute(t))+String(":")+String(second(t))).c_str());
+  DLOG((String("localtime:\r\n")+String(year(t))+String("-")+String(month(t))+String("-")+String(day(t))+String(" ")+String(hour(t))+String(":")+String(minute(t))+String(":")+String(second(t))).c_str());
   return 0;
 }
 
