@@ -21,14 +21,13 @@
    https://github.com/adafruit/Adafruit_NeoPixel
 
 */
-
-#define LOG(arg) Serial.print("[");Serial.print((const char*)__FUNCTION__);Serial.print("] ");Serial.print(arg);Serial.print("\r\n");
-//#define DLOG(arg) Serial.print("VERBOSE [");Serial.print((const char*)__FUNCTION__);Serial.print("] ");Serial.print(arg);Serial.print("\r\n");
+//#define LOG(arg) Serial.print("[");Serial.print((const char*)__FUNCTION__);Serial.print("] ");Serial.print(arg);Serial.print("\r\n");
+#define LOG(arg) ;
+//#define DLOG(arg) Serial.print("VERBOSE [");Serial.print((const char*)__FUNCTION__);Serial.print("] ");Serial.print(arg);
 #define DLOG(arg) ;
 
-
+#define _SS_MAX_RX_BUFF 256
 #include <SoftwareSerial.h>
-// !! Changed: Buffer to 256 !!
 #include <Time.h>
 #include <TimeLib.h>
 #include <Timezone.h>
@@ -128,6 +127,9 @@ uint32_t stcolor = 0; // color statusled
 uint16_t matrix_line[10] = { // array for Matrix, bit=0: LED off, bit=1 LED on
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
+uint16_t cur_matrix_line[10] = { // array for current Matrix, bit=0: LED off, bit=1 LED on
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
 
 uint8_t lastState[3] = {0, 0, 0};
 unsigned long lastTime[3] = {0, 0, 0};
@@ -142,6 +144,8 @@ void setup(void)
   Serial.begin(ESPBAUD);
 
   LOG("start");
+  LOG(__DATE__);
+  LOG(__TIME__);
 
   String sdummy = "";
 
@@ -179,7 +183,7 @@ void setup(void)
   esp8266.begin(ESPBAUD);
 
   if (wifi.sendAT("RST", sdummy) < 0) {
-    LOG("RST Error\r\n");
+    LOG("RST Error");
     LOG(sdummy.c_str());
     m_led.setPixelColor(0, m_led.Color(255, 0, 0, 0));
   }
@@ -191,7 +195,7 @@ void setup(void)
   delay(5000); //RST needs some time
 
   if (wifi.sendAT("CWMODE=1", sdummy) < 0) {
-    LOG("CWMODE=1 Error\r\n");
+    LOG("CWMODE=1 Error");
     LOG(sdummy.c_str());
     m_led.setPixelColor(1, m_led.Color(255, 0, 0, 0));
   }
@@ -202,7 +206,7 @@ void setup(void)
   m_led.show();
 
   if (wifi.sendAT("CWJAP=\""SSID"\",\""PASSWORD"\"", sdummy) < 0) {
-    LOG("CWJAP=... Error\r\n");
+    LOG("CWJAP=... Error");
     LOG(sdummy.c_str());
     m_led.setPixelColor(2, m_led.Color(255, 0, 0, 0));
   }
@@ -213,7 +217,7 @@ void setup(void)
   m_led.show();
 
   if (wifi.sendAT("CIPSTATUS", sdummy) < 0) {
-    LOG("CIPSTATUS Error\r\n");
+    LOG("CIPSTATUS Error");
     LOG(sdummy.c_str());
     m_led.setPixelColor(3, m_led.Color(255, 0, 0, 0));
     m_led.show();
@@ -222,12 +226,12 @@ void setup(void)
     m_led.setPixelColor(3, m_led.Color(0, 255, 0, 0));
     m_led.show();
     if (sdummy.indexOf("STATUS:5") != -1) {
-      LOG("Connected\r\n");
+      LOG("Connected");
       m_led.setPixelColor(4, m_led.Color(0, 255, 0, 0));
       m_led.show();
     }
     else {
-      LOG("NOT Connected\r\n");
+      LOG("NOT Connected");
       LOG(sdummy.c_str());
       m_led.setPixelColor(4, m_led.Color(255, 0, 0, 0));
       m_led.show();
@@ -241,7 +245,7 @@ void setup(void)
   }
 
   if (wifi.getTime(&t_tz) < 0) {
-    LOG("getTime Error\r\n");
+    LOG("getTime Error");
   }
   else {
     LOG((String("time set: ") + String(now())).c_str());
@@ -278,43 +282,43 @@ void loop(void)
     if (reading != curState[0]) {
       curState[0] = reading;
       if (curState[0] == HIGH) {
-        colormode = (colormode +1)%3;
+        colormode = (colormode + 1) % 3;
       }
     }
   }
   lastState[0] = reading;
 
-/*  // cycle display mode
-  reading = digitalRead(PIN_DISP);
-  if (reading != lastState[1]) {
-    lastTime[1] = millis();
-  }
-  if ((millis() - lastTime[1]) > debounce ) {
-    if (reading != curState[1]) {
-      curState[1] = reading;
-      if (curState[1] == HIGH) {
-        dispmode = (dispmode +1)%3;
+  /*  // cycle display mode
+    reading = digitalRead(PIN_DISP);
+    if (reading != lastState[1]) {
+      lastTime[1] = millis();
+    }
+    if ((millis() - lastTime[1]) > debounce ) {
+      if (reading != curState[1]) {
+        curState[1] = reading;
+        if (curState[1] == HIGH) {
+          dispmode = (dispmode +1)%3;
+        }
       }
     }
-  }
-  lastState[1] = reading;
-  
-  // cycle ???
-  reading = digitalRead(PIN_MISC);
-  if (reading != lastState[2]) {
-    lastTime[2] = millis();
-  }
-  if ((millis() - lastTime[2]) > debounce ) {
-    if (reading != curState[2]) {
-      curState[2] = reading;
-      if (curState[2] == HIGH) {
-        xxxmode = (xxxmode +1)%3;
+    lastState[1] = reading;
+
+    // cycle ???
+    reading = digitalRead(PIN_MISC);
+    if (reading != lastState[2]) {
+      lastTime[2] = millis();
+    }
+    if ((millis() - lastTime[2]) > debounce ) {
+      if (reading != curState[2]) {
+        curState[2] = reading;
+        if (curState[2] == HIGH) {
+          xxxmode = (xxxmode +1)%3;
+        }
       }
     }
-  }
-  lastState[2] = reading;
+    lastState[2] = reading;
   */
-  
+
   // Read brightness
   curbright = (int)(MINBRIGHT + (MAXBRIGHT - MINBRIGHT) * analogRead(PIN_LDR) / 1023.0);
 
@@ -397,49 +401,56 @@ uint16_t xy( uint8_t x, uint8_t y)
 /////////////////////////////////////
 // animate to new text second
 void aniMLED() {
-  uint32_t c = 0;
-  uint16_t x = 0;
+  uint8_t  x = 0;
+  uint8_t  new_m = 0;
+  uint8_t  cur_m = 0;
   uint8_t  n = 0;
-  uint8_t  ledx[220]; // max 110 LED*2 (new and current)
-  uint8_t  ledy[220]; // max 110 LED*2 (new and current)
+  uint8_t  ledx[110]; // max 110 LED to be changed
+  uint8_t  ledy[110];
 
   // get all LED to be changed
-  // if LED is already on, it will be switched off and on again
   for (uint8_t i = 0; i <= 9; i++) { // row
     for (uint8_t j = 0; j <= 15; j++) { // column
-      x = bitRead(matrix_line[i], 15 - j); // new
-      c = m_led.getPixelColor(xy(j, i)); // current
-      if (x == 1) { // LED must be switched on
+      new_m = bitRead(matrix_line[i], 15 - j); // new
+      cur_m = bitRead(cur_matrix_line[i], 15 - j); // current
+      if ((new_m == 1) && (cur_m == 0) ) { // LED must be switched on
+        LOG(((String("->ON  ") + String(j)) + (String(",") + String(i))).c_str());
         ledx[n] = j;
         ledy[n] = i;
         n += 1;
-              }
-      if (c != 0) { // LED must be switched off
+      }
+      if ((new_m == 0) && (cur_m == 1)) { // LED must be switched off
+        LOG(((String("->OFF ") + String(j)) + (String(",") + String(i))).c_str());
         ledx[n] = j;
         ledy[n] = i;
         n += 1;
       }
     }
   }
+  LOG(((String("Total ") + String(n)) + String(" LED to change")).c_str());
+  
   // go random through all to be switched LED and switch it
   while (true) {
     x = random(n);
-    if (m_led.getPixelColor(xy(ledx[x], ledy[x]) != 0)) {
-      m_led.setPixelColor(xy(ledx[x], ledy[x]), 0);
+    LOG(n);
+    if (bitRead(cur_matrix_line[ledy[x]], 15 - ledx[x]) == 0) {
+      LOG(((String("OFF -> ON") + String(ledy[x])) + (String(",") + String(ledy[x]))).c_str());
+      m_led.setPixelColor(xy(ledx[x], ledy[x]), mcolor(ledx[x], ledy[x]));
     }
     else {
-      c = mcolor(ledx[x], ledy[x]);
-      m_led.setPixelColor(xy(ledx[x], ledy[x]), c);
+      LOG(((String("ON -> OFF") + String(ledx[x])) + (String(",") + String(ledy[x]))).c_str());
+      m_led.setPixelColor(xy(ledx[x], ledy[x]), 0);
     }
     // remove switched led from array
     // by copying last value to current
     // and decrease counter
-    ledx[x] = ledx[n-1];
-    ledy[x] = ledy[n-1];
+    ledx[x] = ledx[n - 1];
+    ledy[x] = ledy[n - 1];
     n -= 1;
+    LOG("show");
     m_led.show();
     delay(10);
-    if(n==0) break;
+    if (n == 0) break;
   }
 }
 
@@ -461,6 +472,7 @@ void setMLED() {
         m_led.setPixelColor(xy(j, i), 0);
       }
     }
+    cur_matrix_line[i] = matrix_line[i];
   }
 }
 
