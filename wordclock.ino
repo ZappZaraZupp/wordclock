@@ -26,7 +26,7 @@
 //#define DLOG(arg) Serial.print("VERBOSE [");Serial.print((const char*)__FUNCTION__);Serial.print("] ");Serial.print(arg);
 #define DLOG(arg) ;
 
-#define _SS_MAX_RX_BUFF 256
+#define _SS_MAX_RX_BUFF 256 //increase buffer in softwareSerial
 #include <SoftwareSerial.h>
 #include <Time.h>
 #include <TimeLib.h>
@@ -116,6 +116,7 @@ Adafruit_NeoPixel m_led = Adafruit_NeoPixel(M_WIDTH * M_HEIGHT, PIN_MLED, NEO_GR
 Adafruit_NeoPixel z_led = Adafruit_NeoPixel(Z_LEDS, PIN_ZLED, NEO_GRBW + NEO_KHZ800);
 
 uint8_t colormode = 1;
+uint8_t animode = 1;
 time_t curtime;
 time_t oldtime;
 uint8_t f_timesync = 0;
@@ -302,31 +303,39 @@ void loop(void)
       }
     }
     lastState[1] = reading;
-
-    // cycle ???
-    reading = digitalRead(PIN_MISC);
-    if (reading != lastState[2]) {
-      lastTime[2] = millis();
-    }
-    if ((millis() - lastTime[2]) > debounce ) {
-      if (reading != curState[2]) {
-        curState[2] = reading;
-        if (curState[2] == HIGH) {
-          xxxmode = (xxxmode +1)%3;
+  */
+  // cycle animation mode
+  reading = digitalRead(PIN_MISC);
+  if (reading != lastState[2]) {
+    lastTime[2] = millis();
+  }
+  if ((millis() - lastTime[2]) > debounce ) {
+    if (reading != curState[2]) {
+      curState[2] = reading;
+      if (curState[2] == HIGH) {
+        animode = (animode + 1) % 3;
+        switch (animode) {
+          case 0: curzled = 0;
+            break;
+          case 1: curzled = 0b10000000;
+            break;
+          case 2: curzled = 0b01000000;
+            break;
         }
       }
     }
-    lastState[2] = reading;
-  */
+  }
+  lastState[2] = reading;
+
 
   // Read brightness
   curbright = (int)(MINBRIGHT + (MAXBRIGHT - MINBRIGHT) * analogRead(PIN_LDR) / 1023.0);
 
   curtime = now(); // store current time
 
-  // Minute has changed
-  if (minute(curtime) != minute(oldtime)) {
-    curzled = curzled & T_ST; // keep status LED, reset minute LED
+  // every 10 seconds -> reset zed (remove status from e.g. animode change)
+  if (second(curtime)%10 == 0) {
+    curzled =  T_ST; // status LED, reset minute LED
     switch (minute(curtime) % 5) {
       case 1:
         curzled |= T_M1;
@@ -349,8 +358,6 @@ void loop(void)
     }
     else {
       LOG((String("time set: ") + String(now())).c_str());
-      //stcolor=z_led.Color(0,0,0,255);
-      //stcolor=colorwheel(&z_led,3600,minute(curtime)*60 +second(curtime)); // cycle through colors once every hour
       if (f_timesync != 1) {
         f_timesync = 1;
         curtime = now();
@@ -360,21 +367,21 @@ void loop(void)
 
     if (minute(curtime) % 5 == 0) { // 5 minutes intrerval --> new text
       setText();
-      aniMLED();
+      if (animode != 0) {
+        aniMLED();
+      }
     }
   }
 
-  // refresh every second
+  // refresh every second 
+  // tbd: ---> auslagern in interrupt aber wie collidiert das mit animation? evtl nur die zled rausnehmen
   if (second(curtime) != second(oldtime)) {
-    // blink statusLED
     if (f_timesync == 1) {
       stcolor = colorwheel(&z_led, 60, second(curtime)); // cycle through colors once every minute
     }
     else {
       stcolor = z_led.Color(255, 255, 255, 255);
     }
-    // blink status led
-    //curzled = (curzled & T_M4) | (((second(curtime) + 1) % 2) * T_ST); // keep minutes, set statusLED
 
     oldtime = curtime;
     m_led.setBrightness(curbright);
@@ -399,7 +406,7 @@ uint16_t xy( uint8_t x, uint8_t y)
 }
 
 /////////////////////////////////////
-// animate to new text second
+// animate to new text
 void aniMLED() {
   uint8_t  x = 0;
   uint8_t  new_m = 0;
@@ -413,44 +420,94 @@ void aniMLED() {
     for (uint8_t j = 0; j <= 15; j++) { // column
       new_m = bitRead(matrix_line[i], 15 - j); // new
       cur_m = bitRead(cur_matrix_line[i], 15 - j); // current
-      if ((new_m == 1) && (cur_m == 0) ) { // LED must be switched on
-        LOG(((String("->ON  ") + String(j)) + (String(",") + String(i))).c_str());
+      // LED must be switched on or off or stays on (then it will be switched on/off off/on)
+      if ( new_m == 1 ) {
+        LOG(((String("new  ") + String(j)) + (String(",") + String(i))).c_str());
         ledx[n] = j;
         ledy[n] = i;
         n += 1;
       }
-      if ((new_m == 0) && (cur_m == 1)) { // LED must be switched off
-        LOG(((String("->OFF ") + String(j)) + (String(",") + String(i))).c_str());
+      if ( cur_m == 1 ) {
+        LOG(((String("cur  ") + String(j)) + (String(",") + String(i))).c_str());
         ledx[n] = j;
         ledy[n] = i;
         n += 1;
       }
+      // only led that need to change - but that looks booooooring ;-)
+      /*      if ((new_m == 1) && (cur_m == 0) ) { // LED must be switched on
+              LOG(((String("->ON  ") + String(j)) + (String(",") + String(i))).c_str());
+              ledx[n] = j;
+              ledy[n] = i;
+              n += 1;
+            }
+            if ((new_m == 0) && (cur_m == 1)) { // LED must be switched off
+              LOG(((String("->OFF ") + String(j)) + (String(",") + String(i))).c_str());
+              ledx[n] = j;
+              ledy[n] = i;
+              n += 1;
+            }*/
     }
   }
   LOG(((String("Total ") + String(n)) + String(" LED to change")).c_str());
-  
-  // go random through all to be switched LED and switch it
-  while (true) {
-    x = random(n);
-    LOG(n);
-    if (bitRead(cur_matrix_line[ledy[x]], 15 - ledx[x]) == 0) {
-      LOG(((String("OFF -> ON") + String(ledy[x])) + (String(",") + String(ledy[x]))).c_str());
-      m_led.setPixelColor(xy(ledx[x], ledy[x]), mcolor(ledx[x], ledy[x]));
-    }
-    else {
-      LOG(((String("ON -> OFF") + String(ledx[x])) + (String(",") + String(ledy[x]))).c_str());
-      m_led.setPixelColor(xy(ledx[x], ledy[x]), 0);
-    }
-    // remove switched led from array
-    // by copying last value to current
-    // and decrease counter
-    ledx[x] = ledx[n - 1];
-    ledy[x] = ledy[n - 1];
-    n -= 1;
-    LOG("show");
-    m_led.show();
-    delay(10);
-    if (n == 0) break;
+
+  switch (animode) {
+    case 1:
+      // go random through all to be switched LED and switch it
+      while (true) {
+        x = random(n);
+        LOG(n);
+        if (bitRead(cur_matrix_line[ledy[x]], 15 - ledx[x]) == 0) {
+          LOG(((String("OFF -> ON") + String(ledy[x])) + (String(",") + String(ledy[x]))).c_str());
+          m_led.setPixelColor(xy(ledx[x], ledy[x]), mcolor(ledx[x], ledy[x]));
+          bitSet(cur_matrix_line[ledy[x]], 15 - ledx[x]);
+        }
+        else {
+          LOG(((String("ON -> OFF") + String(ledx[x])) + (String(",") + String(ledy[x]))).c_str());
+          m_led.setPixelColor(xy(ledx[x], ledy[x]), 0);
+          bitClear(cur_matrix_line[ledy[x]], 15 - ledx[x]);
+        }
+        // remove switched led from array
+        // by copying last value to current
+        // and decrease counter
+        ledx[x] = ledx[n - 1];
+        ledy[x] = ledy[n - 1];
+        n -= 1;
+        LOG("show");
+        m_led.show();
+        delay(10);
+        if (n == 0) break;
+      }
+      break;
+    case 2:
+      // go left to right
+      // every to change led will get lit up white in the 1st step
+      // and switched to the desired state afterwards
+      for (uint8_t i = 0; i < 11; i++) {
+        for (uint8_t j = 0; j < n; j++) { // find to be switched led in column i and light them
+          if (ledx[j] == i) {
+            m_led.setPixelColor(xy(ledx[j], ledy[j]), m_led.Color(255, 255, 255, 255));
+          }
+        }
+        m_led.show();
+        delay(20);
+        for (uint8_t j = 0; j < n; j++) { // find to be switched led in column i and switch them
+          if (ledx[j] == i) {
+            m_led.setPixelColor(xy(ledx[j], ledy[j]), mcolor(ledx[j], ledy[j]));
+            if (bitRead(matrix_line[ledy[j]], 15 - ledx[j]) == 1) {
+              LOG(((String("->ON") + String(ledy[j])) + (String(",") + String(ledy[j]))).c_str());
+              m_led.setPixelColor(xy(ledx[j], ledy[j]), mcolor(ledx[j], ledy[j]));
+            }
+            else {
+              LOG(((String("OFF") + String(ledx[j])) + (String(",") + String(ledy[j]))).c_str());
+              m_led.setPixelColor(xy(ledx[j], ledy[j]), 0);
+            }
+            LOG("show");
+            m_led.show();
+          }
+        }
+        delay(20);
+      }
+      break;
   }
 }
 
