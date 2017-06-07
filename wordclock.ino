@@ -132,7 +132,9 @@ uint16_t cur_matrix_line[10] = { // array for current Matrix, bit=0: LED off, bi
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-uint8_t lastState[3] = {0, 0, 0};
+uint8_t doAni = 0; // do animation in next refresh
+
+uint8_t lastState[3] = {0, 0, 0}; // for switches
 unsigned long lastTime[3] = {0, 0, 0};
 uint8_t curState[3] = {0, 0, 0};
 unsigned long debounce = 50;
@@ -283,7 +285,7 @@ void loop(void)
     if (reading != curState[0]) {
       curState[0] = reading;
       if (curState[0] == HIGH) {
-        colormode = (colormode + 1) % 3;
+        colormode = (colormode + 1) % 9;
       }
     }
   }
@@ -333,23 +335,9 @@ void loop(void)
 
   curtime = now(); // store current time
 
-  // every 10 seconds -> reset zed (remove status from e.g. animode change)
-  if (second(curtime)%10 == 0) {
-    curzled =  T_ST; // status LED, reset minute LED
-    switch (minute(curtime) % 5) {
-      case 1:
-        curzled |= T_M1;
-        break;
-      case 2:
-        curzled |= T_M2;
-        break;
-      case 3:
-        curzled |= T_M3;
-        break;
-      case 4:
-        curzled |= T_M4;
-        break;
-    }
+  // every minute
+  if (minute(curtime) != minute(oldtime)) {
+
     //stcolor=z_led.Color(255,255,0,0);
     if (wifi.getTime(&t_tz) < 0) { // call ESP8266 for time
       Serial.print("getTime Error\r\n");
@@ -368,12 +356,12 @@ void loop(void)
     if (minute(curtime) % 5 == 0) { // 5 minutes intrerval --> new text
       setText();
       if (animode != 0) {
-        aniMLED();
+        doAni = 1;
       }
     }
   }
 
-  // refresh every second 
+  // refresh every second
   // tbd: ---> auslagern in interrupt aber wie collidiert das mit animation? evtl nur die zled rausnehmen
   if (second(curtime) != second(oldtime)) {
     if (f_timesync == 1) {
@@ -383,14 +371,35 @@ void loop(void)
       stcolor = z_led.Color(255, 255, 255, 255);
     }
 
+    if (second(curtime) % 10 == 0) { //reset z led every 0 sec 
+      curzled =  T_ST; // status LED, reset minute LED
+      switch (minute(curtime) % 5) {
+        case 1:
+          curzled |= T_M1;
+          break;
+        case 2:
+          curzled |= T_M2;
+          break;
+        case 3:
+          curzled |= T_M3;
+          break;
+        case 4:
+          curzled |= T_M4;
+          break;
+      }
+    }
+
     oldtime = curtime;
-    m_led.setBrightness(curbright);
-    setMLED();
-    m_led.show();
     z_led.setBrightness(curbright);
     setZLED();
     z_led.show();
-
+    m_led.setBrightness(curbright);
+    if (doAni != 0) {
+      doAni = 0;
+      aniMLED();
+    }
+    setMLED();
+    m_led.show();
   }
 }
 
@@ -433,8 +442,8 @@ void aniMLED() {
         ledy[n] = i;
         n += 1;
       }
-      // only led that need to change - but that looks booooooring ;-)
-      /*      if ((new_m == 1) && (cur_m == 0) ) { // LED must be switched on
+      /*// only led that need to change - but that looks booooooring ;-)
+           if ((new_m == 1) && (cur_m == 0) ) { // LED must be switched on
               LOG(((String("->ON  ") + String(j)) + (String(",") + String(i))).c_str());
               ledx[n] = j;
               ledy[n] = i;
@@ -479,33 +488,35 @@ void aniMLED() {
       }
       break;
     case 2:
-      // go left to right
-      // every to change led will get lit up white in the 1st step
+      // go left to right with white bar
+      // every to change led will get lit up bright white in the 1st step
       // and switched to the desired state afterwards
-      for (uint8_t i = 0; i < 11; i++) {
-        for (uint8_t j = 0; j < n; j++) { // find to be switched led in column i and light them
-          if (ledx[j] == i) {
-            m_led.setPixelColor(xy(ledx[j], ledy[j]), m_led.Color(255, 255, 255, 255));
+      for (uint8_t j = 0; j < 11; j++) {  //column
+        for (uint8_t i = 0; i < 10; i++) { // row
+          new_m = bitRead(matrix_line[i], 15 - j); // new
+          cur_m = bitRead(cur_matrix_line[i], 15 - j); // current
+          if (new_m == 1 || cur_m == 1 ) {
+            m_led.setPixelColor(xy(j, i), m_led.Color(255, 255, 255, 255));
+          }
+          else {
+            m_led.setPixelColor(xy(j, i), mcolor(j, i));
           }
         }
         m_led.show();
-        delay(20);
-        for (uint8_t j = 0; j < n; j++) { // find to be switched led in column i and switch them
-          if (ledx[j] == i) {
-            m_led.setPixelColor(xy(ledx[j], ledy[j]), mcolor(ledx[j], ledy[j]));
-            if (bitRead(matrix_line[ledy[j]], 15 - ledx[j]) == 1) {
-              LOG(((String("->ON") + String(ledy[j])) + (String(",") + String(ledy[j]))).c_str());
-              m_led.setPixelColor(xy(ledx[j], ledy[j]), mcolor(ledx[j], ledy[j]));
-            }
-            else {
-              LOG(((String("OFF") + String(ledx[j])) + (String(",") + String(ledy[j]))).c_str());
-              m_led.setPixelColor(xy(ledx[j], ledy[j]), 0);
-            }
-            LOG("show");
-            m_led.show();
+        delay(30);
+        // 2nd step show time
+        for (uint8_t i = 0; i < 10; i++) { // row
+          new_m = bitRead(matrix_line[i], 15 - j); // new
+          cur_m = bitRead(cur_matrix_line[i], 15 - j); // current
+          if (new_m == 1) {
+            m_led.setPixelColor(xy(j, i), mcolor(j, i));
+          }
+          else {
+            m_led.setPixelColor(xy(j, i), 0);
           }
         }
-        delay(20);
+        m_led.show();
+        delay(30);
       }
       break;
   }
@@ -723,6 +734,7 @@ void setZLED() {
 /////////////////////////////////////
 // colorfunctions
 uint32_t mcolor(uint8_t x, uint8_t y) { // matrix
+  int iOfDay = (int)(hour(curtime) * 60.0 + minute(curtime));
   switch (colormode) {
     case 0:
     default:
@@ -730,12 +742,24 @@ uint32_t mcolor(uint8_t x, uint8_t y) { // matrix
     case 1:
       return colorwheel(&m_led, 110, (xy(x, y) + (int)(minute(curtime) / 60.0 * 110.0)) % 110); // rainbow over matrix, start cycle once every hour
     case 2:
-      int iOfDay = (int)(hour(curtime) * 60.0 + minute(curtime));
       return colorwheel(&m_led, 1440, iOfDay); // go through cycle once every day whole matrix one color
+    case 3: // red
+      return m_led.Color(255, 0, 0, 0);
+    case 4: // light red
+      return m_led.Color(255, 0, 0, 255);
+    case 5: // blue
+      return m_led.Color(0, 255, 0, 0);
+    case 6: // light blue
+      return m_led.Color(0, 255, 0, 255);
+    case 7: // green
+      return m_led.Color(0, 0, 255, 0);
+    case 8: // light green
+      return m_led.Color(0, 0, 255, 255);
   }
 }
 
 uint32_t zcolor(uint8_t i) { // minutes
+  int iOfDay = (int)(hour(curtime) * 60.0 + minute(curtime));
   switch (colormode) {
     case 0:
     default:
@@ -743,8 +767,19 @@ uint32_t zcolor(uint8_t i) { // minutes
     case 1:
       return colorwheel(&z_led, 110, ((int)(minute(curtime) / 60.0 * 110.0)) % 110); // same color as 1st led of matrix
     case 2:
-      int iOfDay = (int)(hour(curtime) * 60.0 + minute(curtime));
       return colorwheel(&z_led, 1440, iOfDay);
+    case 3: // red
+      return m_led.Color(255, 0, 0, 0);
+    case 4:
+      return m_led.Color(255, 0, 0, 128);
+    case 5: // green
+      return m_led.Color(0, 255, 0, 0);
+    case 6:
+      return m_led.Color(0, 255, 0, 128);
+    case 7: // blue
+      return m_led.Color(0, 0, 255, 0);
+    case 8:
+      return m_led.Color(0, 0, 255, 128);
   }
 }
 
